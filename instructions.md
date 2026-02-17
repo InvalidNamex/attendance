@@ -451,7 +451,7 @@ Future<Map<String, dynamic>> updateSettings({
 
 #### 1. Create Transaction - POST `/transactions/`
 
-**Purpose:** Create a check-in or check-out transaction with optional photo
+**Purpose:** Create a check-in or check-out transaction with optional photo and custom timestamp
 
 **Authentication:** Not required
 
@@ -460,6 +460,7 @@ Future<Map<String, dynamic>> updateSettings({
 **Form Fields:**
 - `user_id` (required): ID of the user for this transaction
 - `stamp_type` (required): 0 for check-in, 1 for check-out
+- `timestamp` (optional): Custom timestamp in ISO 8601 format (e.g., `2026-02-17T10:30:00`). If not provided, uses current UTC time
 - `photo` (optional): Image file
 
 **Response (201):**
@@ -473,6 +474,8 @@ Future<Map<String, dynamic>> updateSettings({
 }
 ```
 
+**Response (400):** Invalid stamp_type or invalid timestamp format
+
 **Flutter/Dio Example:**
 ```dart
 import 'package:image_picker/image_picker.dart';
@@ -480,6 +483,7 @@ import 'package:image_picker/image_picker.dart';
 Future<Map<String, dynamic>> createTransaction({
   required int userId,
   required int stampType,  // 0 = check-in, 1 = check-out
+  DateTime? timestamp,     // Optional custom timestamp
   XFile? photo,
 }) async {
   try {
@@ -487,6 +491,14 @@ Future<Map<String, dynamic>> createTransaction({
       'user_id': userId,
       'stamp_type': stampType,
     });
+    
+    // Add custom timestamp if provided
+    if (timestamp != null) {
+      formData.fields.add(MapEntry(
+        'timestamp',
+        timestamp.toIso8601String(),
+      ));
+    }
     
     // Add photo if provided
     if (photo != null) {
@@ -509,12 +521,48 @@ Future<Map<String, dynamic>> createTransaction({
     return response.data;
   } on DioException catch (e) {
     if (e.response?.statusCode == 400) {
-      throw Exception('Invalid stamp_type. Must be 0 or 1');
+      throw Exception('Invalid data: ${e.response?.data['detail']}');
     }
     rethrow;
   }
 }
+
+// Example 1: Create transaction with current time (auto)
+Future<void> checkInNow(int userId, XFile photo) async {
+  await createTransaction(
+    userId: userId,
+    stampType: 0,
+    photo: photo,
+    // timestamp not provided - uses current time
+  );
+}
+
+// Example 2: Create transaction with custom time (backdating)
+Future<void> checkInAtSpecificTime(int userId, XFile photo, DateTime customTime) async {
+  await createTransaction(
+    userId: userId,
+    stampType: 0,
+    timestamp: customTime,  // Custom timestamp
+    photo: photo,
+  );
+}
+
+// Example 3: Manual entry without photo
+Future<void> manualCheckIn(int userId, DateTime when) async {
+  await createTransaction(
+    userId: userId,
+    stampType: 0,
+    timestamp: when,
+    // No photo provided
+  );
+}
 ```
+
+**Use Cases:**
+- **Real-time check-in/out:** Don't provide timestamp, system uses current time
+- **Manual/backdated entry:** Provide custom timestamp for past transactions
+- **Administrative corrections:** Admin can create transactions for missed check-ins
+- **Offline support:** Store timestamp when offline, sync later with actual time
 
 ---
 
@@ -900,12 +948,20 @@ class AttendanceApiService {
   Future<Map<String, dynamic>> createTransaction({
     required int userId,
     required int stampType,
+    DateTime? timestamp,
     XFile? photo,
   }) async {
     FormData formData = FormData.fromMap({
       'user_id': userId,
       'stamp_type': stampType,
     });
+    
+    if (timestamp != null) {
+      formData.fields.add(MapEntry(
+        'timestamp',
+        timestamp.toIso8601String(),
+      ));
+    }
     
     if (photo != null) {
       formData.files.add(MapEntry(
@@ -1262,11 +1318,13 @@ class TransactionService {
   Future<Map<String, dynamic>> createTransaction({
     required int userId,
     required int stampType,
+    DateTime? timestamp,
     XFile? photo,
   }) async {
     final result = await _api.createTransaction(
       userId: userId,
       stampType: stampType,
+      timestamp: timestamp,
       photo: photo,
     );
     
@@ -1433,7 +1491,7 @@ class TransactionService {
   
   TransactionService(this.apiService);
   
-  Future<Map<String, dynamic>> checkInWithPhoto() async {
+  Future<Map<String, dynamic>> checkInWithPhoto({DateTime? timestamp}) async {
     // Capture photo
     final XFile? photo = await _picker.pickImage(
       source: ImageSource.camera,
@@ -1448,12 +1506,14 @@ class TransactionService {
     
     // Create transaction with photo
     return await apiService.createTransaction(
+      userId: userId,  // Pass appropriate userId
       stampType: 0,  // 0 = check-in
+      timestamp: timestamp,  // Optional custom timestamp
       photo: photo,
     );
   }
   
-  Future<Map<String, dynamic>> checkOutWithPhoto() async {
+  Future<Map<String, dynamic>> checkOutWithPhoto({DateTime? timestamp}) async {
     final XFile? photo = await _picker.pickImage(
       source: ImageSource.camera,
       maxWidth: 1920,
@@ -1466,7 +1526,9 @@ class TransactionService {
     }
     
     return await apiService.createTransaction(
+      userId: userId,  // Pass appropriate userId
       stampType: 1,  // 1 = check-out
+      timestamp: timestamp,  // Optional custom timestamp
       photo: photo,
     );
   }

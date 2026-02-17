@@ -19,6 +19,7 @@ UPLOAD_DIR = "uploads"
 async def create_transaction(
     user_id: int = Form(...),
     stamp_type: int = Form(...),
+    timestamp: Optional[str] = Form(None),
     photo: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -28,6 +29,7 @@ async def create_transaction(
     Parameters:
     - user_id: ID of the user for this transaction
     - stamp_type: 0 for check-in, 1 for check-out
+    - timestamp: Optional timestamp in ISO 8601 format (e.g., "2026-02-17T10:30:00"). If not provided, uses current UTC time
     - photo: Optional photo file upload
     """
     # Validate stamp_type
@@ -36,6 +38,18 @@ async def create_transaction(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="stamp_type must be 0 (in) or 1 (out)"
         )
+    
+    # Parse timestamp if provided, otherwise use current time
+    if timestamp:
+        try:
+            transaction_timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid timestamp format. Use ISO 8601 format (e.g., '2026-02-17T10:30:00')"
+            )
+    else:
+        transaction_timestamp = datetime.utcnow()
     
     # Handle photo upload if provided
     photo_path = None
@@ -53,7 +67,7 @@ async def create_transaction(
     # Create transaction
     new_transaction = Transaction(
         userID=user_id,
-        timestamp=datetime.utcnow(),
+        timestamp=transaction_timestamp,
         photo=photo_path,
         stamp_type=stamp_type
     )
