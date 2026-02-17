@@ -17,20 +17,29 @@ UPLOAD_DIR = "uploads"
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
-    user_id: int = Form(...),
-    stamp_type: int = Form(...),
-    timestamp: Optional[str] = Form(None),
-    photo: UploadFile = File(None),
+    user_id: int = Form(..., description="ID of the user for this transaction"),
+    stamp_type: int = Form(..., description="0 for check-in, 1 for check-out"),
+    timestamp: Optional[str] = Form(
+        None, 
+        description="Optional timestamp in ISO 8601 format (e.g., '2026-02-17T10:30:00'). If not provided, uses current UTC time",
+        example="2026-02-17T10:30:00"
+    ),
+    photo: UploadFile = File(None, description="Optional photo file"),
     db: Session = Depends(get_db)
 ):
     """
     Create a new transaction (check-in or check-out).
     
-    Parameters:
-    - user_id: ID of the user for this transaction
-    - stamp_type: 0 for check-in, 1 for check-out
-    - timestamp: Optional timestamp in ISO 8601 format (e.g., "2026-02-17T10:30:00"). If not provided, uses current UTC time
-    - photo: Optional photo file upload
+    **Form Fields:**
+    - **user_id** (required): ID of the user for this transaction
+    - **stamp_type** (required): 0 for check-in, 1 for check-out
+    - **timestamp** (optional): Custom timestamp in ISO 8601 format (e.g., "2026-02-17T10:30:00"). If not provided, uses current UTC time
+    - **photo** (optional): Photo file upload
+    
+    **Use Cases:**
+    - Leave timestamp empty for real-time check-in/out (uses current time)
+    - Provide timestamp for manual/backdated entries
+    - Admin corrections for missed check-ins
     """
     # Validate stamp_type
     if stamp_type not in [0, 1]:
