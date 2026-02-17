@@ -1,3 +1,122 @@
+# Deployment Guide
+
+This guide covers deploying the Attendance API to different hosting platforms.
+
+---
+
+# Render Deployment (Recommended)
+
+Render is the easiest way to deploy this FastAPI application with native support for ASGI and PostgreSQL.
+
+## Prerequisites
+- GitHub/GitLab account with your code
+- Render account (free tier available)
+- Supabase account (for PostgreSQL database)
+
+## Step-by-Step Deployment
+
+### 1. Set Up Supabase Database
+
+1. Create a Supabase account at https://supabase.com
+2. Create a new project (name it "attendance")
+3. Go to **Project Settings** → **Database**
+4. Under **Connection Pooling**, copy the **Transaction** mode connection string:
+   ```
+   postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-X-region.pooler.supabase.com:6543/postgres
+   ```
+5. Note these values for later:
+   - **user**: `postgres.[PROJECT-REF]`
+   - **password**: Your database password
+   - **host**: `aws-X-region.pooler.supabase.com`
+   - **port**: `6543`
+   - **dbname**: `postgres`
+
+### 2. Deploy to Render
+
+1. Go to https://render.com and sign in
+2. Click **New +** → **Web Service**
+3. Connect your Git repository
+4. Configure the service:
+   - **Name**: `attendance-api`
+   - **Environment**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: Free
+
+### 3. Set Environment Variables
+
+In Render dashboard, go to **Environment** and add these variables:
+
+| Key | Value | Example |
+|-----|-------|---------|
+| `user` | Your Supabase user | `postgres.ihgtizkfuotwjkfttfhd` |
+| `password` | Your Supabase password | `miLN6s7fg1gavXrM` |
+| `host` | Your Supabase pooler host | `aws-1-eu-west-1.pooler.supabase.com` |
+| `port` | Pooler port | `6543` |
+| `dbname` | Database name | `postgres` |
+
+### 4. Deploy
+
+1. Click **Create Web Service**
+2. Render will automatically:
+   - Install dependencies
+   - Start the application
+   - Create tables in your Supabase database
+   - Provide a public URL
+
+### 5. Verify Deployment
+
+Once deployed, visit:
+- **API Docs**: `https://your-service.onrender.com/docs`
+- **Health Check**: `https://your-service.onrender.com/`
+
+Default admin credentials:
+- Username: `admin`
+- Password: `admin123`
+
+⚠️ **Change the admin password immediately after first login!**
+
+## Features on Render
+
+✅ Native ASGI/FastAPI support (no conversion needed)
+✅ Automatic HTTPS
+✅ Free tier available
+✅ Auto-deploy from Git
+✅ Environment variable management
+✅ Built-in logs and monitoring
+✅ PostgreSQL via Supabase (better than SQLite for production)
+
+## Troubleshooting
+
+### Build fails
+- Check `requirements.txt` is up to date
+- Verify Python version compatibility
+
+### Database connection fails
+- Verify environment variables are set correctly
+- Check Supabase project is active (not paused)
+- Use **Transaction pooler** connection, not direct connection
+- Ensure using IPv4-compatible pooler host
+
+### App crashes on startup
+- Check Render logs for errors
+- Verify all environment variables are set
+- Ensure start command is correct
+
+## Cost
+
+**Free Tier includes:**
+- 750 hours/month
+- Automatic sleep after 15 mins of inactivity
+- Spins up on request (may take 30-60 seconds)
+
+**Paid Tier ($7/month):**
+- Always-on service
+- No cold starts
+- More resources
+
+---
+
 # PythonAnywhere Deployment Guide
 
 ## Prerequisites

@@ -1,17 +1,19 @@
-# Attendance API - FastAPI + SQLite
+# Attendance API - FastAPI + PostgreSQL
 
 A complete attendance tracking system with location-based check-in/out, photo capture, HTTP Basic Authentication, and admin controls.
 
 ## Features
 
 - ✅ FastAPI with automatic OpenAPI documentation
-- ✅ SQLite database with SQLAlchemy ORM
+- ✅ PostgreSQL database (Supabase) with SQLAlchemy ORM
 - ✅ HTTP Basic Authentication on all endpoints
 - ✅ Bcrypt password hashing
 - ✅ Role-based access control (Admin/User)
 - ✅ Photo uploads for transactions
 - ✅ Location-based settings (latitude, longitude, radius)
 - ✅ Transaction filtering by date range, user, and type
+- ✅ Environment variable configuration
+- ✅ Production-ready deployment (Render, PythonAnywhere)
 
 ## Project Structure
 
@@ -28,22 +30,39 @@ backend/
 │   └── transactions.py    # Transaction endpoints
 ├── uploads/                # Photo storage directory
 ├── requirements.txt        # Python dependencies
-└── attendance.db          # SQLite database (created at runtime)
+├── .env                    # Environment variables (not in git)
+├── .env.example            # Environment template
+├── render.yaml             # Render deployment config
+└── DEPLOYMENT.md          # Deployment guides
 ```
 
 ## Installation
 
-1. **Install dependencies:**
+### 1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. **Run the server:**
+### 2. Configure environment variables:
+
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
+
+```env
+user=postgres.YOUR_PROJECT_REF
+password=YOUR_SUPABASE_PASSWORD
+host=aws-X-region.pooler.supabase.com
+port=6543
+dbname=postgres
+```
+
+### 3. Run the server:
 ```bash
 uvicorn main:app --reload
 ```
 
-3. **Access the API:**
+The database tables will be created automatically on first run.
+
+### 4. Access the API:
 - API: http://localhost:8000
 - OpenAPI Docs: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc

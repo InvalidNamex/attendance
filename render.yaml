@@ -10,3 +10,15 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
+      # Add these environment variables in Render Dashboard:
+      # Database connection (Supabase)
+      - key: user
+        sync: false  # Set manually in Render: postgres.ihgtizkfuotwjkfttfhd
+      - key: password
+        sync: false  # Set manually in Render: your_supabase_password
+      - key: host
+        sync: false  # Set manually in Render: aws-1-eu-west-1.pooler.supabase.com
+      - key: port
+        sync: false  # Set manually in Render: 6543
+      - key: dbname
+        sync: false  # Set manually in Render: postgres
