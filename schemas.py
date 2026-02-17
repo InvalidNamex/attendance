@@ -67,6 +67,11 @@ class TransactionCreate(BaseModel):
     stamp_type: int  # 0 = in, 1 = out
 
 
+class TransactionUpdate(BaseModel):
+    timestamp: Optional[datetime] = None
+    stamp_type: Optional[int] = None
+
+
 class TransactionResponse(BaseModel):
     id: int
     userID: int

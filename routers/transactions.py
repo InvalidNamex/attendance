@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 from database import get_db
 from models import Transaction, User
-from schemas import TransactionResponse
+from schemas import TransactionResponse, TransactionUpdate
 from auth import get_current_user
 import os
 import uuid
@@ -163,3 +163,82 @@ def get_transaction(
         photo=transaction.photo,
         stamp_type=transaction.stamp_type
     )
+
+
+@router.put("/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(
+    transaction_id: int,
+    update_data: TransactionUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update a transaction's timestamp or stamp type.
+    
+    Parameters:
+    - transaction_id: ID of the transaction to update
+    - timestamp: New timestamp (optional, ISO 8601 format)
+    - stamp_type: New stamp type (optional, 0=in, 1=out)
+    """
+    # Find transaction
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transaction with ID {transaction_id} not found"
+        )
+    
+    # Update fields if provided
+    if update_data.timestamp is not None:
+        transaction.timestamp = update_data.timestamp
+    
+    if update_data.stamp_type is not None:
+        if update_data.stamp_type not in [0, 1]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="stamp_type must be 0 (in) or 1 (out)"
+            )
+        transaction.stamp_type = update_data.stamp_type
+    
+    db.commit()
+    db.refresh(transaction)
+    
+    return TransactionResponse(
+        id=transaction.id,
+        userID=transaction.userID,
+        timestamp=transaction.timestamp,
+        photo=transaction.photo,
+        stamp_type=transaction.stamp_type
+    )
+
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a transaction.
+    
+    Parameters:
+    - transaction_id: ID of the transaction to delete
+    """
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transaction with ID {transaction_id} not found"
+        )
+    
+    # Delete photo file if exists
+    if transaction.photo and os.path.exists(transaction.photo):
+        try:
+            os.remove(transaction.photo)
+        except Exception as e:
+            print(f"Warning: Could not delete photo file {transaction.photo}: {e}")
+    
+    db.delete(transaction)
+    db.commit()
+    
+    return None

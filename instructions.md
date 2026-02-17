@@ -612,6 +612,95 @@ Future<Map<String, dynamic>> getTransaction(int transactionId) async {
 
 ---
 
+#### 4. Update Transaction - PUT `/transactions/{transaction_id}`
+
+**Purpose:** Update a transaction's timestamp or stamp type (for correcting attendance records)
+
+**Authentication:** Not required
+
+**Path Parameters:**
+- `transaction_id`: ID of the transaction to update
+
+**Request Body:** (all fields optional)
+```json
+{
+  "timestamp": "2026-02-17T09:30:00",
+  "stamp_type": 0
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "userID": 1,
+  "timestamp": "2026-02-17T09:30:00",
+  "photo": "uploads/abc123.jpg",
+  "stamp_type": 0
+}
+```
+
+**Response (404):** Transaction not found
+
+**Flutter/Dio Example:**
+```dart
+Future<Map<String, dynamic>> updateTransaction(
+  int transactionId, {
+  DateTime? timestamp,
+  int? stampType,
+}) async {
+  try {
+    Map<String, dynamic> data = {};
+    if (timestamp != null) data['timestamp'] = timestamp.toIso8601String();
+    if (stampType != null) data['stamp_type'] = stampType;
+    
+    final response = await dio.put(
+      '/transactions/$transactionId',
+      data: data,
+    );
+    return response.data;
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) {
+      throw Exception('Transaction not found');
+    } else if (e.response?.statusCode == 400) {
+      throw Exception('Invalid stamp_type. Must be 0 or 1');
+    }
+    rethrow;
+  }
+}
+```
+
+---
+
+#### 5. Delete Transaction - DELETE `/transactions/{transaction_id}`
+
+**Purpose:** Delete a transaction (also deletes associated photo file)
+
+**Authentication:** Not required
+
+**Path Parameters:**
+- `transaction_id`: ID of the transaction to delete
+
+**Response:** 204 No Content
+
+**Response (404):** Transaction not found
+
+**Flutter/Dio Example:**
+```dart
+Future<void> deleteTransaction(int transactionId) async {
+  try {
+    await dio.delete('/transactions/$transactionId');
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) {
+      throw Exception('Transaction not found');
+    }
+    rethrow;
+  }
+}
+```
+
+---
+
 ## Flutter/Dio Examples
 
 ### Complete API Service Class
@@ -772,6 +861,23 @@ class AttendanceApiService {
   Future<Map<String, dynamic>> getTransaction(int transactionId) async {
     final response = await dio.get('/transactions/$transactionId');
     return response.data;
+  }
+  
+  Future<Map<String, dynamic>> updateTransaction(
+    int transactionId, {
+    DateTime? timestamp,
+    int? stampType,
+  }) async {
+    Map<String, dynamic> data = {};
+    if (timestamp != null) data['timestamp'] = timestamp.toIso8601String();
+    if (stampType != null) data['stamp_type'] = stampType;
+    
+    final response = await dio.put('/transactions/$transactionId', data: data);
+    return response.data;
+  }
+  
+  Future<void> deleteTransaction(int transactionId) async {
+    await dio.delete('/transactions/$transactionId');
   }
 }
 ```
