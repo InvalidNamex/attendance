@@ -614,20 +614,24 @@ Future<Map<String, dynamic>> getTransaction(int transactionId) async {
 
 #### 4. Update Transaction - PUT `/transactions/{transaction_id}`
 
-**Purpose:** Update a transaction's timestamp or stamp type (for correcting attendance records)
+**Purpose:** Update a transaction's timestamp or stamp type (useful for correcting attendance records, fixing mistakes, or administrative adjustments)
 
 **Authentication:** Not required
 
 **Path Parameters:**
 - `transaction_id`: ID of the transaction to update
 
-**Request Body:** (all fields optional)
+**Request Body:** (all fields optional - send only what you want to update)
 ```json
 {
   "timestamp": "2026-02-17T09:30:00",
   "stamp_type": 0
 }
 ```
+
+**Request Fields:**
+- `timestamp` (string, optional): New timestamp in ISO 8601 format
+- `stamp_type` (integer, optional): New stamp type (0 = check-in, 1 = check-out)
 
 **Response (200):**
 ```json
@@ -641,6 +645,14 @@ Future<Map<String, dynamic>> getTransaction(int transactionId) async {
 ```
 
 **Response (404):** Transaction not found
+
+**Response (400):** Invalid stamp_type (must be 0 or 1)
+
+**Use Cases:**
+- Fix incorrect check-in/check-out time
+- Change stamp type if user selected wrong option
+- Administrative corrections for attendance records
+- Backdating transactions with proper approval
 
 **Flutter/Dio Example:**
 ```dart
@@ -668,22 +680,50 @@ Future<Map<String, dynamic>> updateTransaction(
     rethrow;
   }
 }
+
+// Example: Correct a transaction's timestamp
+Future<void> correctTransactionTime(int transactionId, DateTime correctTime) async {
+  await updateTransaction(
+    transactionId,
+    timestamp: correctTime,
+  );
+}
+
+// Example: Change stamp type from check-in to check-out
+Future<void> changeToCheckOut(int transactionId) async {
+  await updateTransaction(
+    transactionId,
+    stampType: 1,  // 1 = check-out
+  );
+}
 ```
+
+**Notes:**
+- ⚠️ Photo cannot be updated - create a new transaction to change the photo
+- User ID cannot be changed - transactions are tied to the original user
+- Consider implementing admin-only restrictions in your app for sensitive updates
+- Keep audit logs in your frontend if needed for compliance
 
 ---
 
 #### 5. Delete Transaction - DELETE `/transactions/{transaction_id}`
 
-**Purpose:** Delete a transaction (also deletes associated photo file)
+**Purpose:** Permanently delete a transaction record (also deletes associated photo file from server)
 
 **Authentication:** Not required
 
 **Path Parameters:**
 - `transaction_id`: ID of the transaction to delete
 
-**Response:** 204 No Content
+**Response (204):** No Content (successful deletion)
 
 **Response (404):** Transaction not found
+
+**Use Cases:**
+- Remove duplicate transactions
+- Delete test/invalid records
+- Remove transactions created by mistake
+- Administrative cleanup
 
 **Flutter/Dio Example:**
 ```dart
@@ -697,7 +737,51 @@ Future<void> deleteTransaction(int transactionId) async {
     rethrow;
   }
 }
+
+// Example: Delete with confirmation dialog
+Future<void> deleteTransactionWithConfirmation(
+  BuildContext context,
+  int transactionId,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Delete Transaction'),
+      content: Text('Are you sure you want to delete this transaction? This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+  
+  if (confirmed == true) {
+    try {
+      await deleteTransaction(transactionId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Transaction deleted successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e')),
+      );
+    }
+  }
+}
 ```
+
+**Notes:**
+- ⚠️ **Permanent deletion** - there is no undo or recovery
+- Associated photo file is automatically deleted from server
+- Consider implementing soft-deletes in your app if you need recovery capability
+- Recommend admin-only access for delete operations
+- Consider keeping a local backup before deletion for audit purposes
 
 ---
 
@@ -878,6 +962,411 @@ class AttendanceApiService {
   
   Future<void> deleteTransaction(int transactionId) async {
     await dio.delete('/transactions/$transactionId');
+  }
+}
+```
+
+---
+
+## Practical Transaction Management Examples
+
+### Complete Transaction CRUD Workflow
+
+Here are real-world examples of managing transactions in your Flutter app:
+
+#### 1. Display Transaction History with Edit/Delete Options
+
+```dart
+class TransactionHistoryScreen extends StatefulWidget {
+  @override
+  _TransactionHistoryScreenState createState() => _TransactionHistoryScreenState();
+}
+
+class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
+  final AttendanceApiService _api = AttendanceApiService();
+  List<Map<String, dynamic>> _transactions = [];
+  bool _loading = true;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+  
+  Future<void> _loadTransactions() async {
+    setState(() => _loading = true);
+    try {
+      final transactions = await _api.getTransactions(
+        fromDate: DateTime.now().subtract(Duration(days: 30)),
+        toDate: DateTime.now(),
+      );
+      setState(() {
+        _transactions = transactions;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load transactions: $e')),
+      );
+    }
+  }
+  
+  Future<void> _editTransaction(int transactionId, Map<String, dynamic> transaction) async {
+    // Show edit dialog
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => EditTransactionDialog(transaction: transaction),
+    );
+    
+    if (result != null) {
+      try {
+        await _api.updateTransaction(
+          transactionId,
+          timestamp: result['timestamp'],
+          stampType: result['stamp_type'],
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Transaction updated successfully')),
+        );
+        _loadTransactions(); // Refresh list
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _deleteTransaction(int transactionId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Transaction'),
+        content: Text('Are you sure? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      try {
+        await _api.deleteTransaction(transactionId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Transaction deleted')),
+        );
+        _loadTransactions(); // Refresh list
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: $e')),
+        );
+      }
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return Center(child: CircularProgressIndicator());
+    
+    return ListView.builder(
+      itemCount: _transactions.length,
+      itemBuilder: (context, index) {
+        final transaction = _transactions[index];
+        return TransactionCard(
+          transaction: transaction,
+          onEdit: () => _editTransaction(transaction['id'], transaction),
+          onDelete: () => _deleteTransaction(transaction['id']),
+        );
+      },
+    );
+  }
+}
+```
+
+#### 2. Edit Transaction Dialog
+
+```dart
+class EditTransactionDialog extends StatefulWidget {
+  final Map<String, dynamic> transaction;
+  
+  EditTransactionDialog({required this.transaction});
+  
+  @override
+  _EditTransactionDialogState createState() => _EditTransactionDialogState();
+}
+
+class _EditTransactionDialogState extends State<EditTransactionDialog> {
+  late DateTime _selectedDateTime;
+  late int _selectedStampType;
+  
+  @override
+  void initState() {
+    super.initState();
+    _selectedDateTime = DateTime.parse(widget.transaction['timestamp']);
+    _selectedStampType = widget.transaction['stamp_type'];
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit Transaction'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Date/Time picker
+          ListTile(
+            title: Text('Date & Time'),
+            subtitle: Text(DateFormat('yyyy-MM-dd HH:mm').format(_selectedDateTime)),
+            trailing: Icon(Icons.calendar_today),
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _selectedDateTime,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (date != null) {
+                final time = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.fromDateTime(_selectedDateTime),
+                );
+                if (time != null) {
+                  setState(() {
+                    _selectedDateTime = DateTime(
+                      date.year, date.month, date.day,
+                      time.hour, time.minute,
+                    );
+                  });
+                }
+              }
+            },
+          ),
+          
+          // Stamp type selection
+          DropdownButtonFormField<int>(
+            value: _selectedStampType,
+            decoration: InputDecoration(labelText: 'Type'),
+            items: [
+              DropdownMenuItem(value: 0, child: Text('Check-In')),
+              DropdownMenuItem(value: 1, child: Text('Check-Out')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedStampType = value);
+              }
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'timestamp': _selectedDateTime,
+              'stamp_type': _selectedStampType,
+            });
+          },
+          child: Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+#### 3. Admin Dashboard - Bulk Operations
+
+```dart
+class AdminTransactionManager {
+  final AttendanceApiService _api;
+  
+  AdminTransactionManager(this._api);
+  
+  // Get all transactions for a specific user
+  Future<List<Map<String, dynamic>>> getUserTransactions(int userId) async {
+    return await _api.getTransactions(userId: userId);
+  }
+  
+  // Fix timestamp for multiple transactions (e.g., system time was wrong)
+  Future<void> bulkUpdateTimestamps(
+    List<int> transactionIds,
+    Duration adjustment,
+  ) async {
+    for (int id in transactionIds) {
+      try {
+        final transaction = await _api.getTransaction(id);
+        final originalTime = DateTime.parse(transaction['timestamp']);
+        final newTime = originalTime.add(adjustment);
+        
+        await _api.updateTransaction(
+          id,
+          timestamp: newTime,
+        );
+      } catch (e) {
+        print('Failed to update transaction $id: $e');
+      }
+    }
+  }
+  
+  // Delete all test transactions (e.g., from testing period)
+  Future<void> deleteTestTransactions(DateTime beforeDate) async {
+    final transactions = await _api.getTransactions(
+      toDate: beforeDate,
+    );
+    
+    for (var transaction in transactions) {
+      try {
+        await _api.deleteTransaction(transaction['id']);
+      } catch (e) {
+        print('Failed to delete transaction ${transaction['id']}: $e');
+      }
+    }
+  }
+  
+  // Swap check-in/check-out if user made mistake
+  Future<void> swapStampType(int transactionId) async {
+    final transaction = await _api.getTransaction(transactionId);
+    final currentType = transaction['stamp_type'];
+    final newType = currentType == 0 ? 1 : 0; // Swap 0 <-> 1
+    
+    await _api.updateTransaction(
+      transactionId,
+      stampType: newType,
+    );
+  }
+}
+```
+
+#### 4. Transaction Service with Local Cache
+
+```dart
+class TransactionService {
+  final AttendanceApiService _api;
+  final List<Map<String, dynamic>> _cachedTransactions = [];
+  
+  TransactionService(this._api);
+  
+  // Create transaction and update cache
+  Future<Map<String, dynamic>> createTransaction({
+    required int userId,
+    required int stampType,
+    XFile? photo,
+  }) async {
+    final result = await _api.createTransaction(
+      userId: userId,
+      stampType: stampType,
+      photo: photo,
+    );
+    
+    // Add to cache
+    _cachedTransactions.insert(0, result);
+    
+    return result;
+  }
+  
+  // Get transactions with caching
+  Future<List<Map<String, dynamic>>> getTransactions({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _cachedTransactions.isNotEmpty) {
+      return _cachedTransactions;
+    }
+    
+    final transactions = await _api.getTransactions();
+    _cachedTransactions.clear();
+    _cachedTransactions.addAll(transactions);
+    
+    return _cachedTransactions;
+  }
+  
+  // Update transaction and sync cache
+  Future<Map<String, dynamic>> updateTransaction(
+    int transactionId, {
+    DateTime? timestamp,
+    int? stampType,
+  }) async {
+    final result = await _api.updateTransaction(
+      transactionId,
+      timestamp: timestamp,
+      stampType: stampType,
+    );
+    
+    // Update in cache
+    final index = _cachedTransactions.indexWhere((t) => t['id'] == transactionId);
+    if (index != -1) {
+      _cachedTransactions[index] = result;
+    }
+    
+    return result;
+  }
+  
+  // Delete transaction and remove from cache
+  Future<void> deleteTransaction(int transactionId) async {
+    await _api.deleteTransaction(transactionId);
+    
+    // Remove from cache
+    _cachedTransactions.removeWhere((t) => t['id'] == transactionId);
+  }
+  
+  // Clear cache (logout, etc.)
+  void clearCache() {
+    _cachedTransactions.clear();
+  }
+}
+```
+
+#### 5. Transaction Validation Helper
+
+```dart
+class TransactionValidator {
+  // Check if a transaction can be edited (e.g., within 24 hours)
+  static bool canEdit(Map<String, dynamic> transaction) {
+    final timestamp = DateTime.parse(transaction['timestamp']);
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    return difference.inHours < 24; // Allow edits within 24 hours
+  }
+  
+  // Check if a transaction can be deleted (admin only or within time window)
+  static bool canDelete(Map<String, dynamic> transaction, bool isAdmin) {
+    if (isAdmin) return true;
+    
+    final timestamp = DateTime.parse(transaction['timestamp']);
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    return difference.inMinutes < 30; // Allow delete within 30 minutes
+  }
+  
+  // Validate timestamp is not in the future
+  static bool isValidTimestamp(DateTime timestamp) {
+    return !timestamp.isAfter(DateTime.now());
+  }
+  
+  // Check if changing stamp type is allowed
+  static bool canChangeStampType(
+    int currentType,
+    int newType,
+    Map<String, dynamic> transaction,
+  ) {
+    if (currentType == newType) return false;
+    
+    // Don't allow if there's already another transaction of the new type on the same day
+    // (This logic would need the full transaction list)
+    return true;
   }
 }
 ```
