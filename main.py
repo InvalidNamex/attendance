@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import create_tables, SessionLocal
 from models import User, Settings
@@ -64,6 +65,15 @@ app = FastAPI(
     description="FastAPI + SQLite attendance tracking system with location-based check-in/out",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Configure CORS for web clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins - restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Include routers
