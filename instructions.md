@@ -20,9 +20,9 @@ This guide provides complete instructions for integrating the Attendance API int
 
 ## API Overview
 
-**Base URL:** `http://your-server-url:8000` (replace with your actual server URL)
+**Base URL:** `https://attendance-yagn.onrender.com`
 
-**Authentication:** HTTP Basic Authentication (username + password)
+**Authentication:** HTTP Basic Authentication (username + password) for most endpoints
 
 **Content Type:** `application/json` (except for photo uploads which use `multipart/form-data`)
 
@@ -58,14 +58,14 @@ Create a file `lib/services/api_service.dart`:
 import 'package:dio/dio.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://your-server-url:8000';
+  static const String baseUrl = 'https://attendance-yagn.onrender.com';
   late Dio dio;
   
   ApiService() {
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 3),
+      connectTimeout: const Duration(seconds: 60),  // Increased for Render cold starts
+      receiveTimeout: const Duration(seconds: 30),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -453,11 +453,12 @@ Future<Map<String, dynamic>> updateSettings({
 
 **Purpose:** Create a check-in or check-out transaction with optional photo
 
-**Authentication:** Required (HTTP Basic Auth)
+**Authentication:** Not required
 
 **Content-Type:** `multipart/form-data`
 
 **Form Fields:**
+- `user_id` (required): ID of the user for this transaction
 - `stamp_type` (required): 0 for check-in, 1 for check-out
 - `photo` (optional): Image file
 
@@ -477,11 +478,13 @@ Future<Map<String, dynamic>> updateSettings({
 import 'package:image_picker/image_picker.dart';
 
 Future<Map<String, dynamic>> createTransaction({
+  required int userId,
   required int stampType,  // 0 = check-in, 1 = check-out
   XFile? photo,
 }) async {
   try {
     FormData formData = FormData.fromMap({
+      'user_id': userId,
       'stamp_type': stampType,
     });
     
@@ -519,7 +522,7 @@ Future<Map<String, dynamic>> createTransaction({
 
 **Purpose:** Get all transactions with optional filters
 
-**Authentication:** Required (HTTP Basic Auth)
+**Authentication:** Not required
 
 **Query Parameters:** (all optional)
 - `user_id`: Filter by user ID
@@ -580,14 +583,14 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AttendanceApiService {
-  static const String baseUrl = 'http://your-server-url:8000';
+  static const String baseUrl = 'https://attendance-yagn.onrender.com';
   late Dio dio;
   
   AttendanceApiService() {
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 3),
+      connectTimeout: const Duration(seconds: 60),  // Increased for Render cold starts
+      receiveTimeout: const Duration(seconds: 30),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -683,10 +686,12 @@ class AttendanceApiService {
   
   // Transaction endpoints
   Future<Map<String, dynamic>> createTransaction({
+    required int userId,
     required int stampType,
     XFile? photo,
   }) async {
     FormData formData = FormData.fromMap({
+      'user_id': userId,
       'stamp_type': stampType,
     });
     
@@ -1159,12 +1164,14 @@ void main() async {
 
 1. **Base URL:** Update `baseUrl` in your API service with your actual server URL
 2. **HTTPS:** Use HTTPS in production for secure communication
-3. **Timestamps:** All timestamps are in UTC. Convert to local time in your UI
-4. **Photo Storage:** Photos are stored on the server in the `uploads/` directory
-5. **Permissions:** Request camera and location permissions before using those features
-6. **Error Messages:** The API returns detailed error messages in the `detail` field
-7. **Rate Limiting:** Implement appropriate retry logic and timeouts
-8. **Device ID:** Use a unique device identifier (e.g., from `device_info_plus` package)
+3. **CORS Enabled:** The API supports web clients (Flutter Web, browser apps). CORS is configured to allow all origins - restrict this in production for security
+4. **Render Cold Starts:** The free tier spins down after inactivity. First requests may take 50-90 seconds. Ensure your app has adequate timeouts (60+ seconds for connectTimeout) and consider showing a loading indicator with a message like "Waking up server, please wait..."
+5. **Timestamps:** All timestamps are in UTC. Convert to local time in your UI
+6. **Photo Storage:** Photos are stored on the server in the `uploads/` directory
+7. **Permissions:** Request camera and location permissions before using those features
+8. **Error Messages:** The API returns detailed error messages in the `detail` field
+9. **Rate Limiting:** Implement appropriate retry logic and timeouts
+10. **Device ID:** Use a unique device identifier (e.g., from `device_info_plus` package)
 
 ---
 
