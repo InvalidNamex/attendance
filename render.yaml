@@ -1,0 +1,12 @@
+# Render Blueprint for automatic deployment
+# Place this in your repo root and connect to Render
+
+services:
+  - type: web
+    name: attendance-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0

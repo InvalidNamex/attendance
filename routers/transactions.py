@@ -17,15 +17,16 @@ UPLOAD_DIR = "uploads"
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
+    user_id: int = Form(...),
     stamp_type: int = Form(...),
     photo: UploadFile = File(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """
     Create a new transaction (check-in or check-out).
     
     Parameters:
+    - user_id: ID of the user for this transaction
     - stamp_type: 0 for check-in, 1 for check-out
     - photo: Optional photo file upload
     """
@@ -51,7 +52,7 @@ async def create_transaction(
     
     # Create transaction
     new_transaction = Transaction(
-        userID=current_user.id,
+        userID=user_id,
         timestamp=datetime.utcnow(),
         photo=photo_path,
         stamp_type=stamp_type
@@ -76,8 +77,7 @@ def get_transactions(
     stamp_type: Optional[int] = Query(None, description="Filter by stamp type (0=in, 1=out)"),
     from_date: Optional[str] = Query(None, description="Filter from date (ISO 8601 format)"),
     to_date: Optional[str] = Query(None, description="Filter to date (ISO 8601 format)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """
     Get all transactions with optional filters.
