@@ -573,6 +573,45 @@ Future<List<Map<String, dynamic>>> getTransactions({
 
 ---
 
+#### 3. Get Single Transaction - GET `/transactions/{transaction_id}`
+
+**Purpose:** Get a specific transaction by ID
+
+**Authentication:** Not required
+
+**Path Parameters:**
+- `transaction_id`: ID of the transaction to retrieve
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "userID": 1,
+  "timestamp": "2026-02-17T10:30:00",
+  "photo": "uploads/abc123.jpg",
+  "stamp_type": 0
+}
+```
+
+**Response (404):** Transaction not found
+
+**Flutter/Dio Example:**
+```dart
+Future<Map<String, dynamic>> getTransaction(int transactionId) async {
+  try {
+    final response = await dio.get('/transactions/$transactionId');
+    return response.data;
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) {
+      throw Exception('Transaction not found');
+    }
+    rethrow;
+  }
+}
+```
+
+---
+
 ## Flutter/Dio Examples
 
 ### Complete API Service Class
@@ -728,6 +767,11 @@ class AttendanceApiService {
     
     final response = await dio.get('/transactions/', queryParameters: queryParams);
     return List<Map<String, dynamic>>.from(response.data);
+  }
+  
+  Future<Map<String, dynamic>> getTransaction(int transactionId) async {
+    final response = await dio.get('/transactions/$transactionId');
+    return response.data;
   }
 }
 ```

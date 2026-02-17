@@ -135,3 +135,31 @@ def get_transactions(
         )
         for transaction in transactions
     ]
+
+
+@router.get("/{transaction_id}", response_model=TransactionResponse)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get a single transaction by ID.
+    
+    Parameters:
+    - transaction_id: ID of the transaction to retrieve
+    """
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transaction with ID {transaction_id} not found"
+        )
+    
+    return TransactionResponse(
+        id=transaction.id,
+        userID=transaction.userID,
+        timestamp=transaction.timestamp,
+        photo=transaction.photo,
+        stamp_type=transaction.stamp_type
+    )
