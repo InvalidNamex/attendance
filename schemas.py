@@ -65,11 +65,13 @@ class SettingsResponse(BaseModel):
 # Transaction Schemas
 class TransactionCreate(BaseModel):
     stamp_type: int  # 0 = in, 1 = out
+    device_id: Optional[str] = None
 
 
 class TransactionUpdate(BaseModel):
     timestamp: Optional[datetime] = None
     stamp_type: Optional[int] = None
+    device_id: Optional[str] = None
 
 
 class TransactionResponse(BaseModel):
@@ -77,6 +79,7 @@ class TransactionResponse(BaseModel):
     userID: int
     timestamp: datetime
     photo: Optional[str]
+    device_id: Optional[str]
     stamp_type: int
 
     class Config:

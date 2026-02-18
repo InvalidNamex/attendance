@@ -15,69 +15,27 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 UPLOAD_DIR = "uploads"
 
 
-def _normalize_photo_path(photo: str | None) -> str | None:
-    """Return a cleaned server-relative photo path.
+def _normalize_photo_path(photo: Optional[str]) -> Optional[str]:
+    """Return a response-safe photo URL.
 
-    Robust handling for these input cases:
-    - full URL(s) (http/https)
-    - Windows absolute paths (C:\\.../uploads/...) or mixed separators
-    - multiple values separated by whitespace, commas or semicolons
-
-    The function always attempts to return a path starting with `uploads/` when
-    possible; otherwise it returns a cleaned relative path (no leading slash).
+    - If `photo` is None -> return None
+    - If `photo` is already an absolute HTTP(S) URL -> return it unchanged
+    - Otherwise ensure it starts with a single leading slash so the frontend can
+      request it relative to the API base URL (e.g. `/uploads/...`).
     """
     if not photo:
         return None
 
-    import re
-    from urllib.parse import urlparse
+    photo = photo.strip()
+    # Keep full URLs (Supabase, S3, CDN, etc.) as-is
+    if photo.startswith("http://") or photo.startswith("https://"):
+        return photo
 
-    # Normalize separators and trim
-    raw = photo.replace("\\", "/").strip()
-
-    # Split into candidate tokens (handles space/comma/semicolon-separated values)
-    tokens = [t for t in re.split(r"[\s,;]+", raw) if t]
-
-    def _extract_from_token(tok: str) -> str | None:
-        tok = tok.strip()
-        if not tok:
-            return None
-
-        # If token is a full URL, return it unchanged so frontend can use it directly
-        if tok.startswith("http://") or tok.startswith("https://"):
-            return tok
-
-        # Remove drive letter if present (Windows paths like C:/...)
-        tok = re.sub(r'^[A-Za-z]:', '', tok)
-
-        # Trim leading slashes
-        tok = tok.lstrip('/')
-
-        # If token contains uploads/, return the substring from uploads/
-        idx = tok.find("uploads/")
-        if idx != -1:
-            return tok[idx:]
-
-        # If token starts with uploads/ return it
-        if tok.startswith("uploads/"):
-            return tok
-
-        # Otherwise return the cleaned token
-        return tok or None
-
-    # Prefer the first token that yields an uploads/... path
-    for t in tokens:
-        candidate = _extract_from_token(t)
-        if candidate and candidate.startswith("uploads/"):
-            return candidate
-
-    # If none matched uploads/, return the first non-empty cleaned token
-    for t in tokens:
-        candidate = _extract_from_token(t)
-        if candidate:
-            return candidate
-
-    return None
+    # Normalize Windows backslashes and ensure a leading slash for relative paths
+    photo = photo.replace("\\", "/")
+    if not photo.startswith("/"):
+        return f"/{photo}"
+    return photo
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
@@ -89,6 +47,7 @@ async def create_transaction(
         description="Optional timestamp in ISO 8601 format (e.g., '2026-02-17T10:30:00'). If not provided, uses current UTC time",
         example="2026-02-17T10:30:00"
     ),
+    device_id: Optional[str] = Form(None, description="Optional device id from the user's device"),
     photo: UploadFile = File(None, description="Optional photo file"),
     db: Session = Depends(get_db)
 ):
@@ -99,6 +58,7 @@ async def create_transaction(
     - **user_id** (required): ID of the user for this transaction
     - **stamp_type** (required): 0 for check-in, 1 for check-out
     - **timestamp** (optional): Custom timestamp in ISO 8601 format (e.g., "2026-02-17T10:30:00"). If not provided, uses current UTC time
+    - **device_id** (optional): Device id string from the user's device
     - **photo** (optional): Photo file upload
     
     **Use Cases:**
@@ -131,11 +91,9 @@ async def create_transaction(
         # Generate unique filename
         file_extension = os.path.splitext(photo.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
-        # Store a normalized forward-slash path (e.g. uploads/xxxx.jpg)
-        photo_path = f"{UPLOAD_DIR}/{unique_filename}"
+        photo_path = os.path.join(UPLOAD_DIR, unique_filename)
         
-        # Save file to disk (create upload dir if missing)
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        # Save file to disk
         with open(photo_path, "wb") as buffer:
             content = await photo.read()
             buffer.write(content)
@@ -145,6 +103,7 @@ async def create_transaction(
         userID=user_id,
         timestamp=transaction_timestamp,
         photo=photo_path,
+        device_id=device_id,
         stamp_type=stamp_type
     )
     
@@ -157,6 +116,7 @@ async def create_transaction(
         userID=new_transaction.userID,
         timestamp=new_transaction.timestamp,
         photo=_normalize_photo_path(new_transaction.photo),
+        device_id=new_transaction.device_id,
         stamp_type=new_transaction.stamp_type
     )
 
@@ -221,6 +181,7 @@ def get_transactions(
             userID=transaction.userID,
             timestamp=transaction.timestamp,
             photo=_normalize_photo_path(transaction.photo),
+            device_id=transaction.device_id,
             stamp_type=transaction.stamp_type
         )
         for transaction in transactions
@@ -251,6 +212,7 @@ def get_transaction(
         userID=transaction.userID,
         timestamp=transaction.timestamp,
         photo=_normalize_photo_path(transaction.photo),
+        device_id=transaction.device_id,
         stamp_type=transaction.stamp_type
     )
 
@@ -289,6 +251,9 @@ def update_transaction(
                 detail="stamp_type must be 0 (in) or 1 (out)"
             )
         transaction.stamp_type = update_data.stamp_type
+
+    if update_data.device_id is not None:
+        transaction.device_id = update_data.device_id
     
     db.commit()
     db.refresh(transaction)
@@ -298,6 +263,7 @@ def update_transaction(
         userID=transaction.userID,
         timestamp=transaction.timestamp,
         photo=_normalize_photo_path(transaction.photo),
+        device_id=transaction.device_id,
         stamp_type=transaction.stamp_type
     )
 

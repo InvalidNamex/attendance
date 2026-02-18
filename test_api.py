@@ -82,7 +82,9 @@ def test_create_transaction():
     print("\n=== Testing Create Transaction (without photo) ===")
     auth = HTTPBasicAuth(ADMIN_USERNAME, ADMIN_PASSWORD)
     transaction_data = {
-        "stamp_type": 0  # Check-in
+        "user_id": 1,
+        "stamp_type": 0,  # Check-in
+        "device_id": "device001"
     }
     response = requests.post(f"{BASE_URL}/transactions/", data=transaction_data, auth=auth)
     print(f"Status: {response.status_code}")

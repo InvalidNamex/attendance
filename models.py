@@ -35,6 +35,7 @@ class Transaction(Base):
     userID = Column(Integer, ForeignKey("users.id"), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     photo = Column(String, nullable=True)  # File path to photo
+    device_id = Column(String, nullable=True)  # Device id sent by user's device
     stamp_type = Column(Integer, nullable=False)  # 0 = in, 1 = out
 
     # Relationship to user
