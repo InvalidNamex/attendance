@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import create_tables, SessionLocal
 from models import User, Settings
 from auth import hash_password
+from realtime import manager
 from routers import users, settings, transactions
 
 
@@ -90,3 +91,27 @@ def root():
         "docs": "/docs",
         "redoc": "/redoc"
     }
+
+
+@app.websocket("/ws/transactions")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time transaction updates.
+
+    Clients connect here to receive live INSERT, UPDATE, DELETE events
+    for the transactions table.
+
+    Message format (JSON):
+    {
+        "event": "INSERT" | "UPDATE" | "DELETE",
+        "table": "transactions",
+        "data": { ... transaction fields ... }
+    }
+    """
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive; ignore any client messages
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)

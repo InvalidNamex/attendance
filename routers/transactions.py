@@ -6,6 +6,7 @@ from database import get_db
 from models import Transaction, User
 from schemas import TransactionResponse, TransactionUpdate
 from auth import get_current_user
+from realtime import manager
 import os
 import uuid
 
@@ -36,6 +37,18 @@ def _normalize_photo_path(photo: Optional[str]) -> Optional[str]:
     if not photo.startswith("/"):
         return f"/{photo}"
     return photo
+
+
+def _transaction_to_dict(t, photo_normalized: Optional[str] = None) -> dict:
+    """Convert a transaction to a JSON-serializable dict for WebSocket broadcast."""
+    return {
+        "id": t.id,
+        "userID": t.userID,
+        "timestamp": t.timestamp.isoformat(),
+        "photo": photo_normalized or _normalize_photo_path(t.photo),
+        "device_id": t.device_id,
+        "stamp_type": t.stamp_type,
+    }
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
@@ -111,7 +124,7 @@ async def create_transaction(
     db.commit()
     db.refresh(new_transaction)
     
-    return TransactionResponse(
+    response = TransactionResponse(
         id=new_transaction.id,
         userID=new_transaction.userID,
         timestamp=new_transaction.timestamp,
@@ -119,6 +132,15 @@ async def create_transaction(
         device_id=new_transaction.device_id,
         stamp_type=new_transaction.stamp_type
     )
+
+    # Broadcast INSERT to all connected WebSocket clients
+    await manager.broadcast(
+        event="INSERT",
+        table="transactions",
+        data=_transaction_to_dict(new_transaction, response.photo),
+    )
+
+    return response
 
 
 @router.get("/", response_model=List[TransactionResponse])
@@ -218,7 +240,7 @@ def get_transaction(
 
 
 @router.put("/{transaction_id}", response_model=TransactionResponse)
-def update_transaction(
+async def update_transaction(
     transaction_id: int,
     update_data: TransactionUpdate,
     db: Session = Depends(get_db)
@@ -258,7 +280,7 @@ def update_transaction(
     db.commit()
     db.refresh(transaction)
     
-    return TransactionResponse(
+    response = TransactionResponse(
         id=transaction.id,
         userID=transaction.userID,
         timestamp=transaction.timestamp,
@@ -267,9 +289,18 @@ def update_transaction(
         stamp_type=transaction.stamp_type
     )
 
+    # Broadcast UPDATE to all connected WebSocket clients
+    await manager.broadcast(
+        event="UPDATE",
+        table="transactions",
+        data=_transaction_to_dict(transaction, response.photo),
+    )
+
+    return response
+
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_transaction(
+async def delete_transaction(
     transaction_id: int,
     db: Session = Depends(get_db)
 ):
@@ -294,7 +325,16 @@ def delete_transaction(
         except Exception as e:
             print(f"Warning: Could not delete photo file {transaction.photo}: {e}")
     
+    transaction_id_to_broadcast = transaction.id
+
     db.delete(transaction)
     db.commit()
-    
+
+    # Broadcast DELETE to all connected WebSocket clients
+    await manager.broadcast(
+        event="DELETE",
+        table="transactions",
+        data={"id": transaction_id_to_broadcast},
+    )
+
     return None
