@@ -22,6 +22,8 @@ This guide provides complete instructions for integrating the Attendance API int
 
 **Base URL:** `https://attendance-yagn.onrender.com`
 
+**Interactive Docs:** `https://attendance-yagn.onrender.com/docs` (Swagger UI with full field documentation and examples)
+
 **Authentication:** HTTP Basic Authentication (username + password) for most endpoints
 
 **Content Type:** `application/json` (except for photo uploads which use `multipart/form-data`)
@@ -462,6 +464,8 @@ Future<Map<String, dynamic>> updateSettings({
 - `stamp_type` (required): 0 for check-in, 1 for check-out
 - `timestamp` (optional): Custom timestamp in ISO 8601 format (e.g., `2026-02-17T10:30:00`). If not provided, uses current UTC time
 - `photo` (optional): Image file
+
+**💡 Note:** All fields are fully documented in the interactive Swagger UI at `/docs` with descriptions and example values for easy testing.
 
 **Response (201):**
 ```json
@@ -1829,7 +1833,13 @@ class AuthManager {
 
 You can test endpoints using the interactive documentation:
 
-**Swagger UI:** `http://your-server-url:8000/docs`
+**Swagger UI:** `https://attendance-yagn.onrender.com/docs`
+
+The Swagger UI provides:
+- Complete API documentation with field descriptions and examples
+- Interactive forms to test all endpoints directly in your browser
+- Example values for all parameters (including the optional timestamp field)
+- Request/response schemas and validation rules
 
 Or use Flutter to test:
 
@@ -1879,8 +1889,14 @@ void main() async {
 ## Support
 
 For API documentation, visit:
-- **Swagger UI:** `/docs`
-- **ReDoc:** `/redoc`
+- **Swagger UI:** `https://attendance-yagn.onrender.com/docs` - Interactive API testing with complete field documentation
+- **ReDoc:** `https://attendance-yagn.onrender.com/redoc` - Alternative documentation view
+
+All endpoints are fully documented with:
+- Field descriptions and validation rules
+- Example values and formats
+- Use cases and best practices
+- Error response details
 
 For backend issues, check the backend logs or contact the backend team.
 
