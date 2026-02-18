@@ -15,6 +15,71 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 UPLOAD_DIR = "uploads"
 
 
+def _normalize_photo_path(photo: str | None) -> str | None:
+    """Return a cleaned server-relative photo path.
+
+    Robust handling for these input cases:
+    - full URL(s) (http/https)
+    - Windows absolute paths (C:\\.../uploads/...) or mixed separators
+    - multiple values separated by whitespace, commas or semicolons
+
+    The function always attempts to return a path starting with `uploads/` when
+    possible; otherwise it returns a cleaned relative path (no leading slash).
+    """
+    if not photo:
+        return None
+
+    import re
+    from urllib.parse import urlparse
+
+    # Normalize separators and trim
+    raw = photo.replace("\\", "/").strip()
+
+    # Split into candidate tokens (handles space/comma/semicolon-separated values)
+    tokens = [t for t in re.split(r"[\s,;]+", raw) if t]
+
+    def _extract_from_token(tok: str) -> str | None:
+        tok = tok.strip()
+        if not tok:
+            return None
+
+        # If token is a full URL, return it unchanged so frontend can use it directly
+        if tok.startswith("http://") or tok.startswith("https://"):
+            return tok
+
+        # Remove drive letter if present (Windows paths like C:/...)
+        tok = re.sub(r'^[A-Za-z]:', '', tok)
+
+        # Trim leading slashes
+        tok = tok.lstrip('/')
+
+        # If token contains uploads/, return the substring from uploads/
+        idx = tok.find("uploads/")
+        if idx != -1:
+            return tok[idx:]
+
+        # If token starts with uploads/ return it
+        if tok.startswith("uploads/"):
+            return tok
+
+        # Otherwise return the cleaned token
+        return tok or None
+
+    # Prefer the first token that yields an uploads/... path
+    for t in tokens:
+        candidate = _extract_from_token(t)
+        if candidate and candidate.startswith("uploads/"):
+            return candidate
+
+    # If none matched uploads/, return the first non-empty cleaned token
+    for t in tokens:
+        candidate = _extract_from_token(t)
+        if candidate:
+            return candidate
+
+    return None
+
+
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     user_id: int = Form(..., description="ID of the user for this transaction"),
@@ -66,9 +131,11 @@ async def create_transaction(
         # Generate unique filename
         file_extension = os.path.splitext(photo.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
-        photo_path = os.path.join(UPLOAD_DIR, unique_filename)
+        # Store a normalized forward-slash path (e.g. uploads/xxxx.jpg)
+        photo_path = f"{UPLOAD_DIR}/{unique_filename}"
         
-        # Save file to disk
+        # Save file to disk (create upload dir if missing)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
         with open(photo_path, "wb") as buffer:
             content = await photo.read()
             buffer.write(content)
@@ -89,7 +156,7 @@ async def create_transaction(
         id=new_transaction.id,
         userID=new_transaction.userID,
         timestamp=new_transaction.timestamp,
-        photo=new_transaction.photo,
+        photo=_normalize_photo_path(new_transaction.photo),
         stamp_type=new_transaction.stamp_type
     )
 
@@ -153,7 +220,7 @@ def get_transactions(
             id=transaction.id,
             userID=transaction.userID,
             timestamp=transaction.timestamp,
-            photo=transaction.photo,
+            photo=_normalize_photo_path(transaction.photo),
             stamp_type=transaction.stamp_type
         )
         for transaction in transactions
@@ -183,7 +250,7 @@ def get_transaction(
         id=transaction.id,
         userID=transaction.userID,
         timestamp=transaction.timestamp,
-        photo=transaction.photo,
+        photo=_normalize_photo_path(transaction.photo),
         stamp_type=transaction.stamp_type
     )
 
@@ -230,7 +297,7 @@ def update_transaction(
         id=transaction.id,
         userID=transaction.userID,
         timestamp=transaction.timestamp,
-        photo=transaction.photo,
+        photo=_normalize_photo_path(transaction.photo),
         stamp_type=transaction.stamp_type
     )
 
