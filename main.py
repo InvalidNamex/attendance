@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from database import create_tables, SessionLocal
 from models import User, Settings
 from auth import hash_password
-from realtime import manager
+from ws_manager import manager
 from routers import users, settings, transactions
 
 

@@ -6,7 +6,8 @@ from database import get_db
 from models import Transaction, User
 from schemas import TransactionResponse, TransactionUpdate
 from auth import get_current_user
-from realtime import manager
+from ws_manager import manager
+from storage import upload_photo, delete_photo
 import os
 import uuid
 
@@ -99,23 +100,16 @@ async def create_transaction(
         transaction_timestamp = datetime.utcnow()
     
     # Handle photo upload if provided
-    photo_path = None
+    photo_url = None
     if photo:
-        # Generate unique filename
-        file_extension = os.path.splitext(photo.filename)[1]
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        photo_path = os.path.join(UPLOAD_DIR, unique_filename)
-        
-        # Save file to disk
-        with open(photo_path, "wb") as buffer:
-            content = await photo.read()
-            buffer.write(content)
+        content = await photo.read()
+        photo_url = upload_photo(content, photo.filename)
     
     # Create transaction
     new_transaction = Transaction(
         userID=user_id,
         timestamp=transaction_timestamp,
-        photo=photo_path,
+        photo=photo_url,
         device_id=device_id,
         stamp_type=stamp_type
     )
@@ -318,12 +312,9 @@ async def delete_transaction(
             detail=f"Transaction with ID {transaction_id} not found"
         )
     
-    # Delete photo file if exists
-    if transaction.photo and os.path.exists(transaction.photo):
-        try:
-            os.remove(transaction.photo)
-        except Exception as e:
-            print(f"Warning: Could not delete photo file {transaction.photo}: {e}")
+    # Delete photo from Supabase Storage if exists
+    if transaction.photo:
+        delete_photo(transaction.photo)
     
     transaction_id_to_broadcast = transaction.id
 

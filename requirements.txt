@@ -7,6 +7,7 @@ python-multipart==0.0.6
 requests==2.31.0
 psycopg[binary]==3.3.2
 python-dotenv==1.0.0
+supabase==2.13.0
 
 # Optional: For PythonAnywhere WSGI deployment
 # a2wsgi==1.7.0
