@@ -22,3 +22,8 @@ services:
         sync: false  # Set manually in Render: 6543
       - key: dbname
         sync: false  # Set manually in Render: postgres
+      # Supabase Storage
+      - key: SUPABASE_URL
+        sync: false  # Set manually in Render: https://ihgtizkfuotwjkfttfhd.supabase.co
+      - key: SUPABASE_KEY
+        sync: false  # Set manually in Render: your service_role key
