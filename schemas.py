@@ -48,6 +48,7 @@ class SettingsUpdate(BaseModel):
     radius: Optional[int] = None
     in_time: Optional[str] = None
     out_time: Optional[str] = None
+    timezone: Optional[str] = None
 
 
 class SettingsResponse(BaseModel):
@@ -57,6 +58,7 @@ class SettingsResponse(BaseModel):
     radius: int
     in_time: str
     out_time: str
+    timezone: str
 
     class Config:
         from_attributes = True

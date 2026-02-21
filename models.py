@@ -26,6 +26,7 @@ class Settings(Base):
     radius = Column(Integer, default=0, nullable=False)
     in_time = Column(String, nullable=False)  # e.g., "09:00"
     out_time = Column(String, nullable=False)  # e.g., "17:00"
+    timezone = Column(String, default="UTC", nullable=False)  # IANA timezone name
 
 
 class Transaction(Base):

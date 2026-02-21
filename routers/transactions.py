@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from database import get_db
-from models import Transaction, User
+from models import Transaction, User, Settings
 from schemas import TransactionResponse, TransactionUpdate
 from auth import get_current_user
 from ws_manager import manager
@@ -97,7 +98,10 @@ async def create_transaction(
                 detail="Invalid timestamp format. Use ISO 8601 format (e.g., '2026-02-17T10:30:00')"
             )
     else:
-        transaction_timestamp = datetime.utcnow()
+        # Use the configured timezone from settings
+        settings = db.query(Settings).first()
+        tz_name = settings.timezone if settings else "UTC"
+        transaction_timestamp = datetime.now(ZoneInfo(tz_name)).replace(tzinfo=None)
     
     # Handle photo upload if provided
     photo_url = None

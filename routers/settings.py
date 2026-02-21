@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
+from zoneinfo import available_timezones
 from database import get_db
 from models import Settings, User
 from schemas import SettingsUpdate, SettingsResponse
@@ -31,8 +33,20 @@ def get_settings(
         longitude=settings.longitude,
         radius=settings.radius,
         in_time=settings.in_time,
-        out_time=settings.out_time
+        out_time=settings.out_time,
+        timezone=settings.timezone
     )
+
+
+@router.get("/timezones", response_model=List[str])
+def get_timezones(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all available IANA timezone names (Authenticated users).
+    Returns a sorted list for populating a searchable dropdown.
+    """
+    return sorted(available_timezones())
 
 
 @router.put("/", response_model=SettingsResponse)
@@ -69,6 +83,14 @@ def update_settings(
     if settings_data.out_time is not None:
         settings.out_time = settings_data.out_time
     
+    if settings_data.timezone is not None:
+        if settings_data.timezone not in available_timezones():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid timezone '{settings_data.timezone}'. Use GET /settings/timezones for valid options."
+            )
+        settings.timezone = settings_data.timezone
+    
     db.commit()
     db.refresh(settings)
     
@@ -78,5 +100,6 @@ def update_settings(
         longitude=settings.longitude,
         radius=settings.radius,
         in_time=settings.in_time,
-        out_time=settings.out_time
+        out_time=settings.out_time,
+        timezone=settings.timezone
     )

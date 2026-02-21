@@ -32,7 +32,8 @@ async def lifespan(app: FastAPI):
                 longitude=0.0,
                 radius=100,
                 in_time="09:00",
-                out_time="17:00"
+                out_time="17:00",
+                timezone="UTC"
             )
             db.add(default_settings)
             db.commit()
