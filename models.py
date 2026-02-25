@@ -12,6 +12,9 @@ class User(Base):
     password = Column(String, nullable=False)  # Will store hashed password
     deviceID = Column(String, nullable=True)
     isAdmin = Column(Boolean, default=False, nullable=False)
+    in_time = Column(String, nullable=True)  # User-specific in time
+    out_time = Column(String, nullable=True)  # User-specific out time
+    punch_mandatory = Column(Boolean, default=False, nullable=False)  # Whether punch is mandatory for this user
 
     # Relationship to transactions
     transactions = relationship("Transaction", back_populates="user")

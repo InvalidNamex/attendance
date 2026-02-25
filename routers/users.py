@@ -32,7 +32,10 @@ def create_user(
         userName=user_data.userName,
         password=hash_password(user_data.password),
         deviceID=user_data.deviceID,
-        isAdmin=user_data.isAdmin
+        isAdmin=user_data.isAdmin,
+        in_time=user_data.in_time,
+        out_time=user_data.out_time,
+        punch_mandatory=user_data.punch_mandatory
     )
     
     db.add(new_user)
@@ -43,7 +46,10 @@ def create_user(
         userID=new_user.id,
         userName=new_user.userName,
         deviceID=new_user.deviceID,
-        isAdmin=new_user.isAdmin
+        isAdmin=new_user.isAdmin,
+        in_time=new_user.in_time,
+        out_time=new_user.out_time,
+        punch_mandatory=new_user.punch_mandatory
     )
 
 
@@ -86,7 +92,10 @@ def get_all_users(
             userID=user.id,
             userName=user.userName,
             deviceID=user.deviceID,
-            isAdmin=user.isAdmin
+            isAdmin=user.isAdmin,
+            in_time=user.in_time,
+            out_time=user.out_time,
+            punch_mandatory=user.punch_mandatory
         )
         for user in users
     ]
@@ -138,6 +147,15 @@ def update_user(
     if user_data.deviceID is not None:
         user.deviceID = user_data.deviceID
     
+    if user_data.in_time is not None:
+        user.in_time = user_data.in_time
+    
+    if user_data.out_time is not None:
+        user.out_time = user_data.out_time
+    
+    if user_data.punch_mandatory is not None:
+        user.punch_mandatory = user_data.punch_mandatory
+    
     db.commit()
     db.refresh(user)
     
@@ -145,7 +163,10 @@ def update_user(
         userID=user.id,
         userName=user.userName,
         deviceID=user.deviceID,
-        isAdmin=user.isAdmin
+        isAdmin=user.isAdmin,
+        in_time=user.in_time,
+        out_time=user.out_time,
+        punch_mandatory=user.punch_mandatory
     )
 
 

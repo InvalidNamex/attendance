@@ -9,12 +9,18 @@ class UserCreate(BaseModel):
     password: str
     deviceID: Optional[str] = None
     isAdmin: Optional[bool] = False
+    in_time: Optional[str] = None
+    out_time: Optional[str] = None
+    punch_mandatory: Optional[bool] = False
 
 
 class UserUpdate(BaseModel):
     userName: Optional[str] = None
     password: Optional[str] = None
     deviceID: Optional[str] = None
+    in_time: Optional[str] = None
+    out_time: Optional[str] = None
+    punch_mandatory: Optional[bool] = None
 
 
 class LoginRequest(BaseModel):
@@ -27,6 +33,9 @@ class UserResponse(BaseModel):
     userName: str
     deviceID: Optional[str]
     isAdmin: bool
+    in_time: Optional[str]
+    out_time: Optional[str]
+    punch_mandatory: bool
 
     class Config:
         from_attributes = True
